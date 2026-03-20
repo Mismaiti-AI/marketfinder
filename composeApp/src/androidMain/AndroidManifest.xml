@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- [media_capture] start -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- [media_capture] end -->
+    <!-- [push_notifications] start -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- [push_notifications] end -->
+    <!-- [media_capture] start -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <!-- [media_capture] end -->
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:name="com.marketfinder.MarketFinderApp"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <!-- [media_capture] start -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+        <!-- [media_capture] end -->
+
+        <!-- [maps] Uncomment and replace YOUR_GOOGLE_MAPS_API_KEY_HERE with your key -->
+
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="AIzaSyCvFcA4-DsSTOX-8DwKlPVI1Ss56Lxsu68" />
+
+
+        <!-- [deep_linking] launchMode="singleTask" is required for deep link warm-start handling -->
+        <activity
+            android:exported="true"
+            android:name="com.marketfinder.MainActivity"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- [deep_linking] start -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mismaiti" />
+            </intent-filter>
+            <!-- [deep_linking] end -->
+        </activity>
+
+        <!-- [push_notifications] start -->
+        <service
+            android:name="com.marketfinder.core.data.notifications.MismaitiFcmService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <!-- [push_notifications] end -->
+    </application>
+
+</manifest>

@@ -1,0 +1,211 @@
+# Fastlane configuration for iOS builds and TestFlight deployment
+#
+# Required environment variables (set as GitHub Secrets):
+#   APPLE_ID              - Apple Developer account email
+#   TEAM_ID               - Apple Developer Team ID (10-char alphanumeric)
+#   ITC_TEAM_ID           - App Store Connect Team ID (usually same as TEAM_ID)
+#   APP_BUNDLE_ID         - App bundle identifier (e.g. com.yourcompany.yourapp)
+#   APP_NAME              - App display name for App Store Connect
+#   MATCH_GIT_URL         - Private Git repo URL for certificates/profiles
+#   MATCH_PASSWORD        - Encryption password for match certificates
+#   APP_STORE_CONNECT_API_KEY_ID       - App Store Connect API Key ID
+#   APP_STORE_CONNECT_API_ISSUER_ID    - App Store Connect API Issuer ID
+#   APP_STORE_CONNECT_API_KEY_CONTENT  - App Store Connect API Key (.p8 content, base64)
+#
+# One-time setup (run locally):
+#   bundle exec fastlane setup    # Creates app + certs + profiles in one command
+
+default_platform(:ios)
+
+platform :ios do
+
+  # ──────────────────────────────────────────────────
+  # Helper: Build App Store Connect API key
+  # ──────────────────────────────────────────────────
+  private_lane :get_api_key do
+    app_store_connect_api_key(
+      key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
+      issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
+      key_content: Base64.decode64(ENV["APP_STORE_CONNECT_API_KEY_CONTENT"]),
+      is_key_content_base64: false,
+      in_house: false,
+    )
+  end
+
+  # ──────────────────────────────────────────────────
+  # One-time setup: Create app + generate certs
+  # ──────────────────────────────────────────────────
+  desc "One-time setup: generate certificates and profiles (create app in App Store Connect first)"
+  lane :setup do
+    api_key = get_api_key
+
+    bundle_id = ENV["APP_BUNDLE_ID"] || "com.mismaiti.app"
+
+    UI.important("Ensure the app and Bundle ID are already created in App Store Connect before running this.")
+    UI.important("Go to: https://appstoreconnect.apple.com > My Apps > + > New App")
+
+    # Step 1: Generate App Store distribution certificate + provisioning profile
+    UI.message("Generating App Store certificates and profiles...")
+    match(
+      type: "appstore",
+      api_key: api_key,
+      app_identifier: bundle_id,
+      readonly: false,
+    )
+    UI.success("App Store certificate and profile created")
+
+    # Step 3: Generate development certificate + profile (for local testing)
+    UI.message("Generating Development certificates and profiles...")
+    match(
+      type: "development",
+      api_key: api_key,
+      app_identifier: bundle_id,
+      readonly: false,
+    )
+    UI.success("Development certificate and profile created")
+
+    UI.success("Setup complete! You can now run: bundle exec fastlane release")
+  end
+
+  # ──────────────────────────────────────────────────
+  # Sync signing (used by build lane and CI)
+  # ──────────────────────────────────────────────────
+  desc "Sync code signing certificates and profiles via match"
+  lane :sync_signing do
+    api_key = get_api_key
+
+    # setup_ci creates a temporary keychain, sets it as default,
+    # and configures it for match — handles all CI signing setup
+    setup_ci if is_ci
+
+    bundle_id = ENV["APP_BUNDLE_ID"] || "com.mismaiti.app"
+    match(
+      type: "appstore",
+      api_key: api_key,
+      app_identifier: bundle_id,
+      readonly: is_ci,
+    )
+  end
+
+  # ──────────────────────────────────────────────────
+  # Build: Compile KMP shared code + archive iOS app
+  # ──────────────────────────────────────────────────
+  desc "Build the KMP shared framework via Gradle"
+  lane :build_kmp_framework do
+    # Build the Kotlin Multiplatform shared framework for iOS
+    gradle(
+      task: "composeApp:linkReleaseFrameworkIosArm64",
+      project_dir: "..",
+    )
+  end
+
+  desc "Build and archive the iOS app"
+  lane :build do
+    sync_signing
+
+    # Apply manual signing settings from match to the Xcode project
+    bundle_id = ENV["APP_BUNDLE_ID"] || "com.mismaiti.app"
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: "iosApp.xcodeproj",
+      team_id: ENV["TEAM_ID"],
+      code_sign_identity: "Apple Distribution",
+      profile_name: ENV["sigh_#{bundle_id}_appstore_profile-name"],
+      bundle_identifier: bundle_id,
+    )
+
+    # Build number: use GitHub run number if available, otherwise timestamp
+    build_number = ENV["GITHUB_RUN_NUMBER"] || Time.now.strftime("%Y%m%d%H%M")
+    increment_build_number(
+      build_number: build_number,
+      xcodeproj: "iosApp.xcodeproj",
+    )
+
+    build_app(
+      project: "iosApp.xcodeproj",
+      scheme: "iosApp",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "build/ipa",
+      output_name: "app.ipa",
+      clean: true,
+      cloned_source_packages_path: "SourcePackages",
+      xcargs: "DEVELOPMENT_TEAM='#{ENV["TEAM_ID"]}'",
+    )
+  end
+
+  # ──────────────────────────────────────────────────
+  # Deploy: Upload to TestFlight
+  # ──────────────────────────────────────────────────
+  desc "Upload to TestFlight and add testers"
+  lane :upload_testflight do
+    api_key = get_api_key
+
+    changelog = "Build #{ENV["GITHUB_RUN_NUMBER"]} from #{ENV["GITHUB_SHA"]&.slice(0, 7) || "local"}"
+    app_name = ENV["APP_NAME"] || "App"
+    tester_emails = (ENV["TESTER_EMAILS"] || "").split(",").map(&:strip).reject(&:empty?)
+
+    if tester_emails.empty?
+      # No testers — upload without waiting
+      upload_to_testflight(
+        api_key: api_key,
+        ipa: "build/ipa/app.ipa",
+        skip_waiting_for_build_processing: true,
+        distribute_external: false,
+        changelog: changelog,
+      )
+    else
+      # Has testers — wait for processing then distribute
+      upload_to_testflight(
+        api_key: api_key,
+        ipa: "build/ipa/app.ipa",
+        skip_waiting_for_build_processing: false,
+        groups: ["Internal Testers"],
+        changelog: changelog,
+        beta_app_description: "#{app_name} beta build for testing",
+        beta_app_feedback_email: ENV["APPLE_ID"],
+      )
+
+      # Add individual testers by email
+      tester_emails.each do |email|
+        begin
+          UI.message("Adding tester: #{email}")
+          pilot(
+            api_key: api_key,
+            distribute_only: true,
+            email: email,
+            groups: ["Internal Testers"],
+          )
+        rescue => e
+          UI.important("Could not add tester #{email}: #{e.message}")
+        end
+      end
+
+      UI.success("TestFlight testers added: #{tester_emails.join(', ')}")
+    end
+  end
+
+  # ──────────────────────────────────────────────────
+  # Full pipeline: Build KMP + Archive + TestFlight
+  # ──────────────────────────────────────────────────
+  desc "Full pipeline: build KMP framework, archive iOS app, upload to TestFlight"
+  lane :release do
+    build_kmp_framework
+    build
+    upload_testflight
+  end
+
+  # ──────────────────────────────────────────────────
+  # Tests
+  # ──────────────────────────────────────────────────
+  desc "Run iOS unit tests"
+  lane :test do
+    run_tests(
+      project: "iosApp.xcodeproj",
+      scheme: "iosApp",
+      devices: ["iPhone 15"],
+      clean: true,
+    )
+  end
+
+end
