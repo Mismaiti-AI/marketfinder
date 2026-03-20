@@ -1,0 +1,15 @@
+# Fastlane Match - Code signing management
+# Match stores certificates and profiles in a private Git repo or Google Cloud Storage
+
+type("appstore")                                # appstore, adhoc, development
+app_identifier(ENV["APP_BUNDLE_ID"] || "com.mismaiti.app")
+username(ENV["APPLE_ID"])
+team_id(ENV["TEAM_ID"])
+
+# Storage mode: git (private repo) or google_cloud
+storage_mode("git")
+git_url(ENV["MATCH_GIT_URL"])                   # e.g. "https://github.com/yourorg/certificates.git"
+git_branch("main")
+
+# Don't prompt for password in CI
+readonly(true) if ENV["CI"]

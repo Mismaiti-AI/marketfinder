@@ -1,0 +1,8 @@
+# Fastlane Appfile - App metadata
+# These values are populated from environment variables / GitHub Secrets
+# See build-ios.yml for the required secrets
+
+app_identifier(ENV["APP_BUNDLE_ID"] || "com.mismaiti.app")
+apple_id(ENV["APPLE_ID"])                       # Your Apple Developer email
+team_id(ENV["TEAM_ID"])                         # Apple Developer Team ID
+itc_team_id(ENV["ITC_TEAM_ID"])                 # App Store Connect Team ID (if different)

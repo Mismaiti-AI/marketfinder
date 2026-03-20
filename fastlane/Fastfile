@@ -1,0 +1,82 @@
+# Fastlane configuration for Android builds and Play Store deployment
+#
+# Auto-managed secrets (set per-repo by Mismaiti backend on first dispatch):
+#   ANDROID_KEYSTORE              - Auto-generated PKCS12 keystore (base64)
+#   ANDROID_KEYSTORE_PASSWORD     - Auto-generated password
+#   ANDROID_KEY_ALIAS             - Always "release"
+#   ANDROID_KEY_PASSWORD          - Auto-generated password
+#   APP_PACKAGE_NAME              - From app_config.package
+#
+# Org-level secret (set once):
+#   PLAY_STORE_SERVICE_ACCOUNT_JSON - Base64-encoded Google Play service account JSON key
+#
+# One-time setup:
+#   1. Create a service account in Google Cloud Console with Google Play Developer API access
+#   2. Download the JSON key and base64 encode it: base64 -i service-account.json | pbcopy
+#   3. Create your app in Google Play Console and complete the initial manual upload
+
+default_platform(:android)
+
+platform :android do
+
+  # ──────────────────────────────────────────────────
+  # Build: Signed release AAB
+  # ──────────────────────────────────────────────────
+  desc "Build signed release AAB"
+  lane :build_aab do
+    # Build number: use GitHub run number if available, otherwise timestamp
+    build_number = ENV["GITHUB_RUN_NUMBER"] || Time.now.strftime("%Y%m%d%H%M")
+
+    # Update versionCode in build.gradle.kts
+    # The signing config is read from env vars by build.gradle.kts
+    gradle(
+      task: "composeApp:bundleRelease",
+      print_command: true,
+      properties: {
+        "android.injected.version.code" => build_number,
+      },
+    )
+  end
+
+  # ──────────────────────────────────────────────────
+  # Deploy: Upload AAB to Play Store internal testing
+  # ──────────────────────────────────────────────────
+  desc "Upload AAB to Play Store internal testing track"
+  lane :upload_play_store do
+    package_name = ENV["APP_PACKAGE_NAME"] || ENV["APP_BUNDLE_ID"]
+
+    changelog = "Build #{ENV["GITHUB_RUN_NUMBER"]} from #{ENV["GITHUB_SHA"]&.slice(0, 7) || "local"}"
+
+    # Find the AAB file
+    aab_path = Dir.glob("composeApp/build/outputs/bundle/release/*.aab").first
+    unless aab_path
+      UI.user_error!("No AAB found in composeApp/build/outputs/bundle/release/")
+    end
+
+    UI.message("Uploading #{aab_path} to Play Store internal testing...")
+
+    upload_to_play_store(
+      package_name: package_name,
+      aab: aab_path,
+      track: "internal",
+      release_status: "completed",
+      json_key: ENV["PLAY_STORE_JSON_KEY_PATH"],
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+    )
+
+    UI.success("AAB uploaded to Play Store internal testing track!")
+  end
+
+  # ──────────────────────────────────────────────────
+  # Full pipeline: Build AAB + Upload to Play Store
+  # ──────────────────────────────────────────────────
+  desc "Full pipeline: build signed AAB and upload to Play Store internal testing"
+  lane :release do
+    build_aab
+    upload_play_store
+  end
+
+end

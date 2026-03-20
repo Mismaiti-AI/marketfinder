@@ -188,5 +188,206 @@
     "seed_color": "#4CAF50",
     "style": "elegant"
   },
-  "platform_features_config": {}
+  "platform_features_config": {},
+  "ui_orchestration": {
+    "screens": [
+      {
+        "feature": "Market Directory",
+        "screens": [
+          {
+            "generic_screen": "GenericListScreen",
+            "list_bindings": {
+              "card_title_field": "name",
+              "card_subtitle_field": "address",
+              "card_badge_field": "daysOpen"
+            }
+          },
+          {
+            "generic_screen": "GenericDetailScreen",
+            "detail_rows": [
+              {
+                "field": "name",
+                "label": "Name",
+                "is_badge": false
+              },
+              {
+                "field": "address",
+                "label": "Address",
+                "is_badge": false
+              },
+              {
+                "field": "daysOpen",
+                "label": "Days Open",
+                "is_badge": false
+              },
+              {
+                "field": "hours",
+                "label": "Hours",
+                "is_badge": false
+              },
+              {
+                "field": "isOrganicCertified",
+                "label": "Is Organic Certified",
+                "is_badge": false
+              },
+              {
+                "field": "phoneNumber",
+                "label": "Phone Number",
+                "is_badge": false
+              },
+              {
+                "field": "websiteUrl",
+                "label": "Website Url",
+                "is_badge": false
+              },
+              {
+                "field": "photoUrl",
+                "label": "Photo Url",
+                "is_badge": false
+              },
+              {
+                "field": "description",
+                "label": "Description",
+                "is_badge": false
+              },
+              {
+                "field": "latitude",
+                "label": "Latitude",
+                "is_badge": false
+              },
+              {
+                "field": "longitude",
+                "label": "Longitude",
+                "is_badge": false
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "feature": "Search & Filter",
+        "screens": [
+          {
+            "generic_screen": "GenericListScreen",
+            "list_bindings": {
+              "card_title_field": "name",
+              "card_subtitle_field": "address",
+              "card_badge_field": "daysOpen"
+            }
+          }
+        ]
+      },
+      {
+        "feature": "Favorites",
+        "screens": [
+          {
+            "generic_screen": "GenericListScreen",
+            "list_bindings": {
+              "card_title_field": "marketId",
+              "card_subtitle_field": "userId",
+              "card_badge_field": "savedAt"
+            }
+          }
+        ]
+      },
+      {
+        "feature": "Seasonal Guide",
+        "screens": [
+          {
+            "generic_screen": "GenericListScreen",
+            "list_bindings": {
+              "card_title_field": "name",
+              "card_subtitle_field": "category",
+              "card_badge_field": "vendorName"
+            }
+          }
+        ]
+      },
+      {
+        "feature": "Onboarding",
+        "screens": [
+          {
+            "generic_screen": "GenericListScreen",
+            "list_bindings": {
+              "card_title_field": "name",
+              "card_subtitle_field": "address",
+              "card_badge_field": ""
+            }
+          }
+        ]
+      },
+      {
+        "feature": "Settings",
+        "screens": [
+          {
+            "generic_screen": "GenericSettingsScreen",
+            "list_bindings": {
+              "card_title_field": "",
+              "card_subtitle_field": "",
+              "card_badge_field": ""
+            }
+          }
+        ]
+      }
+    ],
+    "navigation": {
+      "tabs": [
+        {
+          "label": "Home",
+          "icon": "Home",
+          "feature": "Market Directory"
+        },
+        {
+          "label": "Search",
+          "icon": "Search",
+          "feature": "Search & Filter"
+        },
+        {
+          "label": "Map",
+          "icon": "Place",
+          "feature": "Market Directory"
+        },
+        {
+          "label": "Profile",
+          "icon": "AccountCircle",
+          "feature": "Settings"
+        }
+      ],
+      "start_route": "Market Directory"
+    },
+    "dashboard": {
+      "title": "MarketFinder",
+      "greeting": "Welcome back",
+      "stats": [
+        {
+          "model": "Market",
+          "type": "count",
+          "label": "Listings",
+          "icon": "ShoppingCart"
+        },
+        {
+          "model": "Market",
+          "type": "filtered",
+          "label": "Nearby",
+          "icon": "Place",
+          "filter": "isOrganicCertified",
+          "filter_value": "true"
+        }
+      ],
+      "quick_actions": [
+        {
+          "label": "New Market",
+          "icon": "Add",
+          "route": "CreateMarket",
+          "model": "Market"
+        }
+      ],
+      "recent_items": {
+        "model": "Market",
+        "title": "Recent Markets",
+        "display_field": "name",
+        "subtitle_field": "address"
+      }
+    }
+  }
 }
