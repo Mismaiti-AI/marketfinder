@@ -1,0 +1,274 @@
+name: Build iOS & Deploy to TestFlight
+
+# ============================================================================
+# SETUP GUIDE - Required GitHub Secrets
+# ============================================================================
+#
+# 1. Apple Developer Account secrets:
+#    APPLE_ID                          - Your Apple Developer email
+#    TEAM_ID                           - 10-char Team ID from developer.apple.com/account
+#    ITC_TEAM_ID                       - App Store Connect Team ID (often same as TEAM_ID)
+#    APP_BUNDLE_ID                     - e.g. com.yourcompany.yourapp
+#    APP_NAME                          - App display name (used in TestFlight metadata)
+#
+# 2. App Store Connect API Key (for TestFlight upload):
+#    APP_STORE_CONNECT_API_KEY_ID      - Key ID from App Store Connect > Users > Keys
+#    APP_STORE_CONNECT_API_ISSUER_ID   - Issuer ID from the same page
+#    APP_STORE_CONNECT_API_KEY_CONTENT - Base64 of the .p8 key file:
+#                                        base64 -i AuthKey_XXXXXXXXXX.p8 | pbcopy
+#
+# 3. Fastlane Match (code signing):
+#    MATCH_GIT_URL                     - Private repo for certs, e.g. https://github.com/org/certs.git
+#    MATCH_PASSWORD                    - Encryption password for the match repo
+#    MATCH_GIT_BASIC_AUTHORIZATION     - base64("username:personal_access_token")
+#                                        echo -n "username:ghp_xxxx" | base64 | pbcopy
+#
+# One-time local setup (before first CI run):
+#    cd iosApp
+#    bundle install
+#    bundle exec fastlane match init       # Point to your certs repo
+#    bundle exec fastlane match appstore   # Generate certs & profiles
+# ============================================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      session_id:
+        description: 'Mismaiti session ID (for build callback)'
+        required: true
+        type: string
+      callback_url:
+        description: 'Backend callback URL (e.g. https://api.mismaiti.com)'
+        required: true
+        type: string
+      callback_token:
+        description: 'Short-lived callback token for build-complete authentication'
+        required: true
+        type: string
+      enable_unit_tests:
+        description: 'Enable unit tests'
+        required: false
+        type: boolean
+        default: true
+      upload_testflight:
+        description: 'Upload to TestFlight after build'
+        required: false
+        type: boolean
+        default: true
+      tester_emails:
+        description: 'Comma-separated emails to add as TestFlight testers'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  build:
+    name: iOS Build + TestFlight
+    runs-on: macos-14
+    timeout-minutes: 60
+
+    env:
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      TEAM_ID: ${{ secrets.TEAM_ID }}
+      ITC_TEAM_ID: ${{ secrets.ITC_TEAM_ID }}
+      APP_BUNDLE_ID: ${{ secrets.APP_BUNDLE_ID }}
+      APP_NAME: ${{ secrets.APP_NAME }}
+      APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+      APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+      APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+      TESTER_EMAILS: ${{ inputs.tester_emails }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── Java + Gradle (for KMP shared framework) ──
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # ── Ruby + Fastlane ──
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: iosApp
+
+      - name: Install Fastlane
+        working-directory: iosApp
+        run: |
+          if [ -f "fastlane/Gemfile" ]; then
+            bundle install
+          else
+            gem install fastlane
+          fi
+
+      # ── SPM Cache ──
+      - name: Cache Swift Package Manager
+        uses: actions/cache@v4
+        with:
+          path: |
+            iosApp/SourcePackages
+            ~/Library/Developer/Xcode/DerivedData/**/SourcePackages
+          key: ${{ runner.os }}-spm-${{ hashFiles('iosApp/*.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'iosApp/iosApp.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
+
+      # ── Select Xcode ──
+      - name: Select Xcode version
+        run: |
+          # Use latest available Xcode on the runner
+          XCODE_PATH=$(ls -d /Applications/Xcode*.app 2>/dev/null | sort -V | tail -1)
+          if [ -n "$XCODE_PATH" ]; then
+            sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+          fi
+          xcodebuild -version
+
+      # ── Build KMP shared framework ──
+      - name: Build KMP shared framework
+        run: ./gradlew composeApp:linkReleaseFrameworkIosArm64 --stacktrace
+
+      # ── Tests ──
+      - name: Run unit tests
+        if: inputs.enable_unit_tests
+        working-directory: iosApp
+        run: bundle exec fastlane test
+        continue-on-error: false
+
+      # ── Check signing secrets ──
+      - name: Check signing configuration
+        id: signing_check
+        run: |
+          if [ -n "$TEAM_ID" ] && [ -n "$MATCH_GIT_URL" ] && [ -n "$APP_STORE_CONNECT_API_KEY_ID" ]; then
+            echo "signing_configured=true" >> $GITHUB_OUTPUT
+            echo "Code signing secrets are configured"
+          else
+            echo "signing_configured=false" >> $GITHUB_OUTPUT
+            echo "Warning: Code signing secrets not configured - building debug only"
+          fi
+
+      # ── Signed Release Build (when secrets are configured) ──
+      - name: Build and archive (Release + signed)
+        if: steps.signing_check.outputs.signing_configured == 'true'
+        working-directory: iosApp
+        run: bundle exec fastlane build
+
+      - name: Upload to TestFlight
+        if: >-
+          steps.signing_check.outputs.signing_configured == 'true' &&
+          inputs.upload_testflight
+        working-directory: iosApp
+        run: bundle exec fastlane upload_testflight
+
+      # ── Fallback Debug Build (when secrets are NOT configured) ──
+      - name: Resolve SPM dependencies
+        if: steps.signing_check.outputs.signing_configured != 'true'
+        working-directory: iosApp
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project iosApp.xcodeproj \
+            -scheme iosApp
+
+      - name: Build iOS app (Debug - unsigned)
+        if: steps.signing_check.outputs.signing_configured != 'true'
+        working-directory: iosApp
+        run: |
+          xcodebuild \
+            -project iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty --color --simple
+
+      # ── Artifacts ──
+      - name: Collect IPA info
+        id: ipa_info
+        if: always()
+        run: |
+          IPA_FILE=$(find iosApp/build/ipa -name "*.ipa" 2>/dev/null | head -n 1)
+          if [ -f "$IPA_FILE" ]; then
+            IPA_SIZE=$(du -h "$IPA_FILE" | cut -f1)
+            echo "ipa_path=$IPA_FILE" >> $GITHUB_OUTPUT
+            echo "ipa_size=$IPA_SIZE" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        if: steps.ipa_info.outputs.ipa_path != ''
+        with:
+          name: app-ios-release
+          path: ${{ steps.ipa_info.outputs.ipa_path }}
+          retention-days: 30
+
+      # ── Summary ──
+      - name: Build summary
+        if: always()
+        run: |
+          echo "## iOS Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.signing_check.outputs.signing_configured }}" = "true" ]; then
+            echo "**Build type:** Release (signed)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Build type:** Debug (unsigned - configure secrets for Release)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -n "${{ steps.ipa_info.outputs.ipa_path }}" ]; then
+            echo "**IPA:** ${{ steps.ipa_info.outputs.ipa_size }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ inputs.upload_testflight }}" = "true" ] && [ "${{ steps.signing_check.outputs.signing_configured }}" = "true" ]; then
+            echo "**TestFlight:** Uploaded" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tests:** ${{ inputs.enable_unit_tests && 'Enabled' || 'Disabled' }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload test results
+        if: inputs.enable_unit_tests && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: iosApp/TestResults.xcresult
+          retention-days: 7
+
+      # ── Callback to Mismaiti backend ──
+      - name: Notify backend (build complete)
+        if: always() && inputs.session_id != '' && inputs.callback_url != ''
+        run: |
+          STATUS="failure"
+          if [ "${{ job.status }}" = "success" ]; then
+            STATUS="success"
+          fi
+
+          TESTFLIGHT="false"
+          if [ "${{ inputs.upload_testflight }}" = "true" ] && [ "${{ steps.signing_check.outputs.signing_configured }}" = "true" ]; then
+            TESTFLIGHT="true"
+          fi
+
+          curl -s -X POST "${{ inputs.callback_url }}/api/v1/build-complete" \
+            -H "Content-Type: application/json" \
+            -d "{\"session_id\": \"${{ inputs.session_id }}\", \"platform\": \"ios\", \"status\": \"${STATUS}\", \"testflight\": ${TESTFLIGHT}, \"workflow_run_id\": \"${{ github.run_id }}\", \"callback_token\": \"${{ inputs.callback_token }}\"}" \
+            || echo "Warning: build callback failed (non-fatal)"
