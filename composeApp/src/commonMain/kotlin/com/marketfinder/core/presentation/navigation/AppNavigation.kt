@@ -13,13 +13,13 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 // [deep_linking] start
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+// import androidx.compose.runtime.LaunchedEffect
+// import androidx.compose.runtime.collectAsState
 // [deep_linking] end
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 // [deep_linking] start
-import kotlinx.coroutines.flow.StateFlow
+// import kotlinx.coroutines.flow.StateFlow
 // [deep_linking] end
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -166,8 +166,8 @@ fun MainScaffold(
     startDestination: Any,
     showTopBar: Boolean = true,
     // [deep_linking] start
-    pendingDeepLink: StateFlow<String?>? = null,
-    onDeepLink: ((NavHostController, String) -> Unit)? = null,
+    // pendingDeepLink: StateFlow<String?>? = null,
+    // onDeepLink: ((NavHostController, String) -> Unit)? = null,
     // [deep_linking] end
     builder: androidx.navigation.NavGraphBuilder.(NavHostController) -> Unit
 ) {
@@ -176,15 +176,15 @@ fun MainScaffold(
     val currentDestination = navBackStackEntry?.destination
 
     // [deep_linking] start
-    if (pendingDeepLink != null && onDeepLink != null) {
-        val deepLinkUri by pendingDeepLink.collectAsState()
-        LaunchedEffect(deepLinkUri) {
-            val uri = deepLinkUri
-            if (uri != null) {
-                onDeepLink(navController, uri)
-            }
-        }
-    }
+    // if (pendingDeepLink != null && onDeepLink != null) {
+        // val deepLinkUri by pendingDeepLink.collectAsState()
+        // LaunchedEffect(deepLinkUri) {
+            // val uri = deepLinkUri
+            // if (uri != null) {
+                // onDeepLink(navController, uri)
+            // }
+        // }
+    // }
     // [deep_linking] end
 
     val isOnTab = tabs.any { tab ->

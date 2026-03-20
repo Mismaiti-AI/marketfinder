@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 // [deep_linking] start
-import kotlinx.coroutines.flow.StateFlow
+// import kotlinx.coroutines.flow.StateFlow
 // [deep_linking] end
 
 /**
@@ -130,8 +130,8 @@ fun AppOrchestrator(
     homeBuilder: (NavGraphBuilder.(NavHostController) -> Unit)? = null,
     showTopBar: Boolean = true,
     // [deep_linking] start
-    pendingDeepLink: StateFlow<String?>? = null,
-    onDeepLink: ((NavHostController, String) -> Unit)? = null
+    // pendingDeepLink: StateFlow<String?>? = null,
+    // onDeepLink: ((NavHostController, String) -> Unit)? = null
     // [deep_linking] end
 ) {
     when (appState) {
@@ -163,8 +163,8 @@ fun AppOrchestrator(
                     startDestination = homeStartDestination,
                     showTopBar = showTopBar,
                     // [deep_linking] start
-                    pendingDeepLink = pendingDeepLink,
-                    onDeepLink = onDeepLink,
+                    // pendingDeepLink = pendingDeepLink,
+                    // onDeepLink = onDeepLink,
                     // [deep_linking] end
                     builder = homeBuilder
                 )
