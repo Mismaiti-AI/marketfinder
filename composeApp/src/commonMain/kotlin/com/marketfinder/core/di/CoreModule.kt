@@ -12,10 +12,8 @@ import co.touchlab.kermit.Logger
 // [firestore] start
 // import com.marketfinder.core.data.firestore.UserProfileSync
 // [firestore] end
-// [google_sheets] start
-// import com.marketfinder.core.data.gsheets.GoogleSheetsConfig
-// import com.marketfinder.core.data.gsheets.GoogleSheetsService
-// [google_sheets] end
+import com.marketfinder.core.data.gsheets.GoogleSheetsConfig
+import com.marketfinder.core.data.gsheets.GoogleSheetsService
 // [chat] start
 // import com.marketfinder.core.data.chat.AiChatService
 // [chat] end
@@ -97,10 +95,8 @@ fun coreModule() = module {
     // single<SocialAuthBackendHandler> { FirebaseAuthHandler() }
     // [firebase_auth] end
 
-    // [google_sheets] start
-    // single { GoogleSheetsConfig(get()) }
-    // single { GoogleSheetsService(get()) }
-    // [google_sheets] end
+    single { GoogleSheetsConfig(get()) }
+    single { GoogleSheetsService(get()) }
 
     // [chat] start
     // Note: Register your AiChatService implementation here

@@ -54,10 +54,8 @@ kotlin {
             // implementation(libs.androidx.media3.exoplayer)
             // implementation(libs.androidx.media3.ui)
             // [video_player] end
-            // [maps] start
-            // implementation(libs.google.maps.compose)
-            // implementation(libs.google.play.services.maps)
-            // [maps] end
+            implementation(libs.google.maps.compose)
+            implementation(libs.google.play.services.maps)
 
             // [firebase] start
             // implementation(project.dependencies.platform(libs.firebase.bom))
@@ -67,7 +65,10 @@ kotlin {
             // [push_notifications] implementation(libs.firebase.messaging)
             // [firestore] implementation(libs.firebase.firestore)
             // [messaging] implementation(libs.firebase.database)
-        }
+        
+        // Google Maps
+        implementation("com.google.android.gms:play-services-maps:18.2.0")
+}
 
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)

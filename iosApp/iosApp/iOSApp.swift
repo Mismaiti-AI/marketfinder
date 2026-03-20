@@ -49,13 +49,13 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     //     // Messaging.messaging().apnsToken = deviceToken
     //     // [firebase] end
     // }
-    //
+    // //
     // // [firebase] start
     // // func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
     // //     guard let token = fcmToken else { return }
     // //     IosPushNotificationService.companion.fcmToken = token
     // // }
-    //
+    // //
     // // func userNotificationCenter(
     // //     _ center: UNUserNotificationCenter,
     // //     willPresent notification: UNNotification,

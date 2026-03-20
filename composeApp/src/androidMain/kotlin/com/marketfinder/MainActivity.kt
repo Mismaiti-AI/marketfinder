@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
     //     super.onNewIntent(intent)
     //     handleDeepLink(intent)
     // }
-    //
+    // //
     // private fun handleDeepLink(intent: Intent?) {
     //     intent?.data?.toString()?.let { uri ->
     //         deepLinkHandler.handleIncomingUri(uri)

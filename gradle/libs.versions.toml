@@ -30,20 +30,20 @@ ksp = "2.2.20-2.0.4"
 koin = "4.1.1"
 ui = "1.10.1"
 # [auth] start
-androidx-credentials = "1.5.0"
-googleid = "1.2.0"
+# androidx-credentials = "1.5.0"
+# googleid = "1.2.0"
 # [auth] end
 materialkolor = "4.1.1"
 # [video_player] start
-media3 = "1.9.2"
+# media3 = "1.9.2"
 # [video_player] end
 # [camera] start
-androidx-exifinterface = "1.4.2"
+# androidx-exifinterface = "1.4.2"
 # [camera] end
 google-maps-compose = "8.2.0"
 google-play-services-maps = "20.0.0"
 # [payment] start
-purchases-kmp = "2.7.0+17.41.0"
+# purchases-kmp = "2.7.0+17.41.0"
 # [payment] end
 firebase-bom = "34.10.0"
 google-services = "4.4.4"
@@ -107,52 +107,50 @@ androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref =
 androidx-room-sqlite-wrapper = { module = "androidx.room:room-sqlite-wrapper", version.ref = "room" }
 
 # [auth] start
-androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "androidx-credentials" }
-androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "androidx-credentials" }
-googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
+# androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "androidx-credentials" }
+# androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "androidx-credentials" }
+# googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 # [auth] end
 
 
 # [camera] start
-androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "androidx-exifinterface" }
+# androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "androidx-exifinterface" }
 # [camera] end
 
 # [video_player] start
-androidx-media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
-androidx-media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3" }
+# androidx-media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
+# androidx-media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3" }
 # [video_player] end
 
-# [maps] start
 google-maps-compose = { module = "com.google.maps.android:maps-compose", version.ref = "google-maps-compose" }
 google-play-services-maps = { module = "com.google.android.gms:play-services-maps", version.ref = "google-play-services-maps" }
-# [maps] end
 
 # [firebase] start
-firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
-firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
-firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
+# firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
+# firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+# firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 # [firebase] end
 
 # [push_notifications] start
-firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
+# firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
 # [push_notifications] end
 
 # [firestore] start
-firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
+# firebase-firestore = { module = "com.google.firebase:firebase-firestore" }
 # [firestore] end
 
 # [messaging] start
-firebase-database = { module = "com.google.firebase:firebase-database" }
+# firebase-database = { module = "com.google.firebase:firebase-database" }
 # [messaging] end
 
 # [firebase_auth] start
-gitlive-firebase-auth = { module = "dev.gitlive:firebase-auth", version.ref = "gitlive-firebase" }
-gitlive-firebase-common = { module = "dev.gitlive:firebase-common", version.ref = "gitlive-firebase" }
+# gitlive-firebase-auth = { module = "dev.gitlive:firebase-auth", version.ref = "gitlive-firebase" }
+# gitlive-firebase-common = { module = "dev.gitlive:firebase-common", version.ref = "gitlive-firebase" }
 # [firebase_auth] end
 
 # [payment] start
-purchases-kmp-core = { module = "com.revenuecat.purchases:purchases-kmp-core", version.ref = "purchases-kmp" }
-purchases-kmp-ui = { module = "com.revenuecat.purchases:purchases-kmp-ui", version.ref = "purchases-kmp" }
+# purchases-kmp-core = { module = "com.revenuecat.purchases:purchases-kmp-core", version.ref = "purchases-kmp" }
+# purchases-kmp-ui = { module = "com.revenuecat.purchases:purchases-kmp-ui", version.ref = "purchases-kmp" }
 # [payment] end
 
 [plugins]
@@ -165,6 +163,6 @@ kotlinx-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", vers
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 androidx-room = { id = "androidx.room", version.ref = "room" }
 # [firebase] start
-google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }
-crashlytics = { id = "com.google.firebase.crashlytics", version = "3.0.6" }
+# google-services = { id = "com.google.gms.google-services", version.ref = "google-services" }
+# crashlytics = { id = "com.google.firebase.crashlytics", version = "3.0.6" }
 # [firebase] end
