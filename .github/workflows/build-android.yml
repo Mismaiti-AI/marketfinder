@@ -1,0 +1,300 @@
+name: Build Android & Deploy to Play Store
+
+# ============================================================================
+# SETUP GUIDE - Required GitHub Secrets
+# ============================================================================
+#
+# Auto-managed by Mismaiti (set per-repo on first Android build dispatch):
+#    ANDROID_KEYSTORE              - Auto-generated PKCS12 release keystore (base64)
+#    ANDROID_KEYSTORE_PASSWORD     - Auto-generated keystore password
+#    ANDROID_KEY_ALIAS             - Always "release"
+#    ANDROID_KEY_PASSWORD          - Auto-generated key password
+#    APP_PACKAGE_NAME              - From app_config.package
+#
+# Set at org level (once):
+#    PLAY_STORE_SERVICE_ACCOUNT_JSON - Base64 of service account JSON:
+#                                      base64 -i play-service-account.json | pbcopy
+#
+# One-time setup:
+#   1. Google Play Console > Setup > API access > Create service account
+#   2. Grant "Release to testing tracks" permission to the service account
+#   3. Create your app in Play Console and complete the first manual AAB upload
+# ============================================================================
+
+on:
+  workflow_dispatch:
+    inputs:
+      session_id:
+        description: 'Mismaiti session ID (for build callback)'
+        required: true
+        type: string
+      callback_url:
+        description: 'Backend callback URL (e.g. https://api.mismaiti.com)'
+        required: true
+        type: string
+      callback_token:
+        description: 'Short-lived callback token for build-complete authentication'
+        required: true
+        type: string
+      enable_unit_tests:
+        description: 'Enable unit tests'
+        required: false
+        type: boolean
+        default: true
+      upload_play_store:
+        description: 'Upload to Play Store internal testing after build'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    name: Android Build + Play Store
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      APP_PACKAGE_NAME: ${{ secrets.APP_PACKAGE_NAME }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # ── Decode signing secrets ──
+      - name: Check signing configuration
+        id: signing_check
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE }}" ] && [ -n "$ANDROID_KEY_ALIAS" ]; then
+            echo "signing_configured=true" >> $GITHUB_OUTPUT
+            echo "Code signing secrets are configured"
+          else
+            echo "signing_configured=false" >> $GITHUB_OUTPUT
+            echo "Warning: Signing secrets not configured - building with debug keystore"
+          fi
+
+      - name: Decode release keystore
+        if: steps.signing_check.outputs.signing_configured == 'true'
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE }}" | base64 --decode > ${{ github.workspace }}/release.keystore
+          echo "ANDROID_KEYSTORE_PATH=${{ github.workspace }}/release.keystore" >> $GITHUB_ENV
+
+      - name: Check Play Store configuration
+        id: play_store_check
+        run: |
+          if [ -n "${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}" ] && [ -n "$APP_PACKAGE_NAME" ]; then
+            echo "play_store_configured=true" >> $GITHUB_OUTPUT
+            echo "Play Store secrets are configured"
+          else
+            echo "play_store_configured=false" >> $GITHUB_OUTPUT
+            echo "Warning: Play Store secrets not configured - skipping upload"
+          fi
+
+      - name: Decode Play Store service account
+        if: steps.play_store_check.outputs.play_store_configured == 'true'
+        run: |
+          echo "${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}" | base64 --decode > ${{ github.workspace }}/play-service-account.json
+          echo "PLAY_STORE_JSON_KEY_PATH=${{ github.workspace }}/play-service-account.json" >> $GITHUB_ENV
+
+      # ── Debug keystore (fallback) ──
+      - name: Create debug keystore
+        if: steps.signing_check.outputs.signing_configured != 'true'
+        run: |
+          mkdir -p ~/.android
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkeypair -v \
+              -keystore ~/.android/debug.keystore \
+              -storepass android \
+              -keypass android \
+              -alias androiddebugkey \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # ── Ruby + Fastlane (for Play Store upload) ──
+      - name: Set up Ruby
+        if: >-
+          steps.signing_check.outputs.signing_configured == 'true' &&
+          steps.play_store_check.outputs.play_store_configured == 'true' &&
+          inputs.upload_play_store
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.2'
+          bundler-cache: true
+          working-directory: .
+
+      - name: Install Fastlane
+        if: >-
+          steps.signing_check.outputs.signing_configured == 'true' &&
+          steps.play_store_check.outputs.play_store_configured == 'true' &&
+          inputs.upload_play_store
+        run: |
+          if [ -f "Gemfile" ]; then
+            bundle install
+          else
+            gem install fastlane
+          fi
+
+      # ── Tests ──
+      - name: Run unit tests
+        if: inputs.enable_unit_tests
+        run: ./gradlew testDebugUnitTest
+        continue-on-error: false
+
+      # ── Build debug APK (always) ──
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      # ── Build signed release AAB (when signing is configured) ──
+      - name: Build release AAB (signed)
+        if: steps.signing_check.outputs.signing_configured == 'true'
+        run: ./gradlew composeApp:bundleRelease --stacktrace
+
+      # ── Build unsigned release APK (fallback) ──
+      - name: Build release APK (debug-signed)
+        if: steps.signing_check.outputs.signing_configured != 'true'
+        run: ./gradlew assembleRelease --stacktrace
+
+      # ── Upload to Play Store ──
+      - name: Upload to Play Store internal testing
+        if: >-
+          steps.signing_check.outputs.signing_configured == 'true' &&
+          steps.play_store_check.outputs.play_store_configured == 'true' &&
+          inputs.upload_play_store
+        run: bundle exec fastlane upload_play_store
+
+      # ── Artifacts ──
+      - name: Get build artifacts info
+        id: build_info
+        if: always()
+        run: |
+          DEBUG_APK=$(find composeApp/build/outputs/apk/debug -name "*.apk" 2>/dev/null | head -n 1)
+          RELEASE_APK=$(find composeApp/build/outputs/apk/release -name "*.apk" 2>/dev/null | head -n 1)
+          RELEASE_AAB=$(find composeApp/build/outputs/bundle/release -name "*.aab" 2>/dev/null | head -n 1)
+
+          if [ -f "$DEBUG_APK" ]; then
+            DEBUG_SIZE=$(du -h "$DEBUG_APK" | cut -f1)
+            echo "debug_apk=$DEBUG_APK" >> $GITHUB_OUTPUT
+            echo "debug_size=$DEBUG_SIZE" >> $GITHUB_OUTPUT
+          fi
+
+          if [ -f "$RELEASE_APK" ]; then
+            RELEASE_SIZE=$(du -h "$RELEASE_APK" | cut -f1)
+            echo "release_apk=$RELEASE_APK" >> $GITHUB_OUTPUT
+            echo "release_size=$RELEASE_SIZE" >> $GITHUB_OUTPUT
+          fi
+
+          if [ -f "$RELEASE_AAB" ]; then
+            AAB_SIZE=$(du -h "$RELEASE_AAB" | cut -f1)
+            echo "release_aab=$RELEASE_AAB" >> $GITHUB_OUTPUT
+            echo "aab_size=$AAB_SIZE" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        if: steps.build_info.outputs.debug_apk != ''
+        with:
+          name: app-debug
+          path: ${{ steps.build_info.outputs.debug_apk }}
+          retention-days: 30
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        if: steps.build_info.outputs.release_apk != ''
+        with:
+          name: app-release
+          path: ${{ steps.build_info.outputs.release_apk }}
+          retention-days: 30
+
+      - name: Upload release AAB
+        uses: actions/upload-artifact@v4
+        if: steps.build_info.outputs.release_aab != ''
+        with:
+          name: app-release-bundle
+          path: ${{ steps.build_info.outputs.release_aab }}
+          retention-days: 30
+
+      # ── Summary ──
+      - name: Build summary
+        if: always()
+        run: |
+          echo "## Android Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.signing_check.outputs.signing_configured }}" = "true" ]; then
+            echo "**Build type:** Release (signed)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Build type:** Debug (unsigned - configure secrets for Release)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -n "${{ steps.build_info.outputs.debug_apk }}" ]; then
+            echo "**Debug APK:** ${{ steps.build_info.outputs.debug_size }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -n "${{ steps.build_info.outputs.release_apk }}" ]; then
+            echo "**Release APK:** ${{ steps.build_info.outputs.release_size }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -n "${{ steps.build_info.outputs.release_aab }}" ]; then
+            echo "**Release AAB:** ${{ steps.build_info.outputs.aab_size }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ inputs.upload_play_store }}" = "true" ] && [ "${{ steps.play_store_check.outputs.play_store_configured }}" = "true" ] && [ "${{ steps.signing_check.outputs.signing_configured }}" = "true" ]; then
+            echo "**Play Store:** Uploaded to internal testing" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tests:** ${{ inputs.enable_unit_tests && 'Enabled' || 'Disabled' }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload test results
+        if: inputs.enable_unit_tests && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-results
+          path: |
+            composeApp/build/test-results/**/*.xml
+            composeApp/build/reports/tests/
+          retention-days: 7
+
+      # ── Callback to Mismaiti backend ──
+      - name: Notify backend (build complete)
+        if: always() && inputs.session_id != '' && inputs.callback_url != ''
+        run: |
+          STATUS="failure"
+          if [ "${{ job.status }}" = "success" ]; then
+            STATUS="success"
+          fi
+
+          PLAY_STORE="false"
+          if [ "${{ inputs.upload_play_store }}" = "true" ] && [ "${{ steps.play_store_check.outputs.play_store_configured }}" = "true" ] && [ "${{ steps.signing_check.outputs.signing_configured }}" = "true" ]; then
+            PLAY_STORE="true"
+          fi
+
+          curl -s -X POST "${{ inputs.callback_url }}/api/v1/build-complete" \
+            -H "Content-Type: application/json" \
+            -d "{\"session_id\": \"${{ inputs.session_id }}\", \"platform\": \"android\", \"status\": \"${STATUS}\", \"play_store\": ${PLAY_STORE}, \"workflow_run_id\": \"${{ github.run_id }}\", \"callback_token\": \"${{ inputs.callback_token }}\"}" \
+            || echo "Warning: build callback failed (non-fatal)"

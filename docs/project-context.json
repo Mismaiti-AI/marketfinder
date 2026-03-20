@@ -1,0 +1,192 @@
+{
+  "app_config": {
+    "app_type": "directory",
+    "name": "MarketFinder",
+    "package": "com.marketfinder",
+    "purpose": "helps users discover local farmers markets"
+  },
+  "features": [
+    {
+      "api_endpoints": [],
+      "description": "Browse local farmers markets with full details, directions, and contact info",
+      "display_name": "Markets",
+      "name": "Market Directory",
+      "priority": "high",
+      "repositories": [],
+      "screens": [
+        {
+          "display_name": "Market List",
+          "name": "MarketListScreen"
+        },
+        {
+          "display_name": "Market Detail",
+          "name": "MarketDetailScreen"
+        }
+      ],
+      "use_cases": [
+        "Browse market list",
+        "View market details",
+        "Get directions to market",
+        "Call market directly"
+      ]
+    },
+    {
+      "api_endpoints": [],
+      "description": "Find markets by name, location, days open, organic status, products, and distance",
+      "display_name": "Search",
+      "name": "Search & Filter",
+      "priority": "high",
+      "repositories": [],
+      "screens": [
+        {
+          "display_name": "Market Search",
+          "name": "MarketSearchScreen"
+        }
+      ],
+      "use_cases": [
+        "Search markets by name",
+        "Filter by days open",
+        "Filter by organic certification",
+        "Search by product availability",
+        "Filter by distance from user"
+      ]
+    },
+    {
+      "api_endpoints": [],
+      "description": "Save and access favorite farmers markets for quick reference",
+      "display_name": "Favorites",
+      "name": "Favorites",
+      "priority": "medium",
+      "repositories": [],
+      "screens": [
+        {
+          "display_name": "Favorite Market List",
+          "name": "FavoriteMarketListScreen"
+        }
+      ],
+      "use_cases": [
+        "Save market to favorites",
+        "View saved markets list",
+        "Remove from favorites"
+      ]
+    },
+    {
+      "api_endpoints": [],
+      "description": "Browse what produce is currently in season at local farmers markets",
+      "display_name": "Seasonal",
+      "name": "Seasonal Guide",
+      "priority": "medium",
+      "repositories": [],
+      "screens": [
+        {
+          "display_name": "Seasonal Guide",
+          "name": "SeasonalGuideScreen"
+        }
+      ],
+      "use_cases": [
+        "Browse current seasonal produce",
+        "See which markets carry seasonal items"
+      ]
+    },
+    {
+      "api_endpoints": [],
+      "description": "First-time user walkthrough with 3 swipeable pages introducing the app",
+      "display_name": "Welcome",
+      "name": "Onboarding",
+      "priority": "low",
+      "repositories": [],
+      "screens": [
+        {
+          "display_name": "Onboarding",
+          "name": "OnboardingScreen"
+        }
+      ],
+      "use_cases": [
+        "Show welcome screens on first launch",
+        "Skip onboarding after completion"
+      ]
+    },
+    {
+      "api_endpoints": [],
+      "description": "App preferences including dark mode toggle and general settings",
+      "display_name": "Settings",
+      "name": "Settings",
+      "priority": "low",
+      "repositories": [],
+      "screens": [
+        {
+          "display_name": "Settings",
+          "name": "SettingsScreen"
+        }
+      ],
+      "use_cases": [
+        "Toggle dark mode",
+        "View app information"
+      ]
+    }
+  ],
+  "data_models": [
+    {
+      "fields": [
+        "id: String",
+        "name: String",
+        "address: String",
+        "daysOpen: String",
+        "hours: String",
+        "isOrganicCertified: Boolean",
+        "phoneNumber: String",
+        "websiteUrl: String",
+        "photoUrl: String",
+        "description: String",
+        "latitude: Double",
+        "longitude: Double"
+      ],
+      "layer": "domain",
+      "name": "Market",
+      "relationships": []
+    },
+    {
+      "fields": [
+        "id: String",
+        "name: String",
+        "category: String",
+        "marketId: String",
+        "isInSeason: Boolean",
+        "photoUrl: String",
+        "price: Double",
+        "vendorName: String"
+      ],
+      "layer": "domain",
+      "name": "Product",
+      "relationships": []
+    },
+    {
+      "fields": [
+        "id: String",
+        "marketId: String",
+        "userId: String",
+        "savedAt: Instant"
+      ],
+      "layer": "domain",
+      "name": "Favorite",
+      "relationships": []
+    }
+  ],
+  "backend_config": {
+    "config": {
+      "columns_created": true,
+      "config_type": "hardcoded",
+      "copy_url": "https://docs.google.com/spreadsheets/d/1oabfnWwfR0nSMFv3ed4EpYJsxLyjS40fFJ94R799vFU/copy",
+      "spreadsheet_id": "1oabfnWwfR0nSMFv3ed4EpYJsxLyjS40fFJ94R799vFU",
+      "spreadsheet_url": "https://docs.google.com/spreadsheets/d/1oabfnWwfR0nSMFv3ed4EpYJsxLyjS40fFJ94R799vFU/edit"
+    },
+    "type": "google_sheets"
+  },
+  "ui_design": {
+    "has_dark_mode": true,
+    "palette_style": "TonalSpot",
+    "seed_color": "#4CAF50",
+    "style": "elegant"
+  },
+  "platform_features_config": {}
+}
